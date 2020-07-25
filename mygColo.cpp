@@ -79,49 +79,8 @@ Model buildmodel(){
         updateDelpActuator(osimModel, actuNames[3],"src/delp2.txt",.011,.068,-1,16);
         updateDelpActuator(osimModel, actuNames[4],"src/delp3.txt",.011,.068,-1,18);
         updateDelpActuator(osimModel, actuNames[5],"src/delp6.txt",.011,.068,-1,20);
-        osimModel.print("results/mycolo_initial.osim");
 //	const ControllerSet &controllerSet = osimModel.getControllerSet();
 	osimModel.updControllerSet().remove(0);
-
-	//auto& tip= osimModel.updJointSet().get("tip");
-        double allStiff = 10000, allDamping = 5., allTransition = 5.;
-         CoordinateLimitForce* toeLimitForce = new  CoordinateLimitForce("q0", 85,
-        allStiff, 0, allStiff, allDamping, allTransition);
-        osimModel.addForce(toeLimitForce);
-
-
-
-	
-	return osimModel;
-	}
-
-int main() {
-    data=readvars();
-    cout<<"starting moco study\n";
-    MocoStudy study;Vector initActivations(14,0.);
-        //q0=59.21615420384034;
-        //q1=  -109.2635775666555;
-        //q2=   121.0735620408570;
-        //q3=  -117.6353763282228;
-        q0=50;q1=-65;q2=20;q3=-20;
-	
-        qi0L=30*Pi/180;qi0H=80*Pi/180;
-        qi1L=-109*Pi/180;qi1H=-50*Pi/180;
-        qi2L=50*Pi/180;qi2H=140*Pi/180;
-        qi3L=-120*Pi/180;qi3H=0*Pi/180;
-        q0=q0*Pi/180.; q1=q1*Pi/180.; q2=q2*Pi/180.; q3=q3*Pi/180.;
-        cout<<"qi:"<<endl<<qi0L<<","<<qi0H<<endl<<
-	qi1L<<","<<qi1H<<endl<<
-	qi2L<<","<<qi2H<<endl<<
-	qi3L<<","<<qi3H<<endl;
-
-    study.setName("4link");
-
-    // Define the optimal control problem.
-    // ===================================
-    MocoProblem& problem = study.updProblem();
-	//build the initial model with initial angles and get initial activations
-	Model osimModel=buildmodel();
 
 	q0L=30*Pi/180;q0H=90*Pi/180;
 	auto& actuA = osimModel.updComponent<DelpActuator>("am");
@@ -133,6 +92,49 @@ int main() {
 	auto& actuH = osimModel.updComponent<DelpActuator>("hm");
 	q3L=actuH.getDelpLowAngle();
 	q3H=actuH.getDelpHighAngle();
+        cout<<"qLimits:"<<endl<<q0L<<","<<q0H<<endl<<
+	q1L<<","<<q1H<<endl<<
+	q2L<<","<<q2H<<endl<<
+	q3L<<","<<q3H<<endl;
+
+	//auto& tip= osimModel.updJointSet().get("tip");
+        double allStiff = 10000, allDamping = 5., allTransition = 5.;
+         CoordinateLimitForce* toeLimitForce = new  CoordinateLimitForce("q0", 85,
+        allStiff, 0, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* ankleLimitForce = new  CoordinateLimitForce("q1", q1H*180/Pi-5,
+        allStiff, q1L*180/Pi+5, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* kneeLimitForce = new  CoordinateLimitForce("q2", q2H*180/Pi-5,
+        allStiff, q2L*180/Pi+5, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* hipLimitForce = new  CoordinateLimitForce("q3", q3H*180/Pi-5,
+        allStiff, q3L*180/Pi+5, allStiff, allDamping, allTransition);
+        osimModel.addForce(toeLimitForce);
+        osimModel.addForce(ankleLimitForce);
+        osimModel.addForce(kneeLimitForce);
+        osimModel.addForce(hipLimitForce);
+
+        osimModel.print("results/mycolo_initial.osim");
+
+
+	
+	return osimModel;
+	}
+
+int main() {
+    data=readvars();
+    cout<<"starting moco study\n";
+    MocoStudy study;Vector initActivations(14,0.);
+        q0=data.doubles[4].val;q1=data.doubles[5].val;q2=data.doubles[6].val;q3=data.doubles[7].val;
+	
+        q0=q0*Pi/180.; q1=q1*Pi/180.; q2=q2*Pi/180.; q3=q3*Pi/180.;
+
+    study.setName("4link");
+
+    // Define the optimal control problem.
+    // ===================================
+    MocoProblem& problem = study.updProblem();
+	//build the initial model with initial angles and get initial activations
+	Model osimModel=buildmodel();
+
 
     // Model (dynamics).
     // -----------------
@@ -154,8 +156,8 @@ int main() {
 		data.doubles[3].val, data.doubles[0].val));
 
     // Initial position must be 0, final position must be 1.
-    problem.setStateInfo("/jointset/tip/q0/value", MocoBounds(qi0L,qi0H),
-                         MocoInitialBounds(q0), MocoFinalBounds(qi0L,qi0H));
+    problem.setStateInfo("/jointset/tip/q0/value", MocoBounds(q0L,q0H),
+                         MocoInitialBounds(q0), MocoFinalBounds(q0L,q0H));
     problem.setStateInfo("/jointset/ankle/q1/value", {q1L,q1H}, q1, {q1L,q1H});
     problem.setStateInfo("/jointset/knee/q2/value",  {q2L,q2H}, q2, {q2L,q2H});
     problem.setStateInfo("/jointset/hip/q3/value",   {q3L,q3H}, q3, {q3L,q3H});
@@ -236,9 +238,11 @@ timSeriesToBinFile(controlTable,"results/mycolo_controls.bin");
     // Visualize.
     // ==========
     //study.visualize(solution);
-    fwdCheck(osimModel , solution );
-    cout<<"got objective:"<<solution.getObjective()<<endl;
+    double fwdjump=fwdCheck(osimModel , solution );
+ cout<<solution.getObjectiveTermByIndex(0)<<"\t"<<solution.getObjectiveTermByIndex(1)<<endl;
+    //cout<<"got objective:"<<solution.getObjective()<<endl;
     cout<<"numsprings:"<<data.ints[3].val<<endl;
-
+    cout<<"echo "<<data.ints[3].val<<","<<solution.getObjectiveTermByIndex(0)<<","<<fwdjump<<
+	">>results/all.csv"<<endl;
     return EXIT_SUCCESS;
 }

@@ -1,10 +1,14 @@
 i iterations 9000
-i timediv 50 
+i timediv 80 
 s modelfile src/delp_initial.osim
 s finite_difference_scheme forward
 d timemax 1.00
 d optimalforce 300.
 d converance_tolerance 1e-2
 i require_initsystem 0
-i num_of_springs 16
+i num_of_springs 10
 d timemin 0.4 
+d initial_q0 50
+d initial_q1 -65
+d initial_q2 20
+d initial_q3 -20

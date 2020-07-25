@@ -1,7 +1,7 @@
 //#include <Moco/Components/ActivationCoordinateActuator.h>
 #include <OpenSim/Common/STOFileAdapter.h>
 #include <Moco/osimMoco.h>
-#include "PrescribedController.cpp"
+#include "myPrescribedController.cpp"
 //#include "console.h"
 using namespace OpenSim;
 using namespace SimTK;
@@ -116,7 +116,7 @@ void trajToBinFile(MocoTrajectory solution, string filename)
  
 
 //
-int fwdCheck(Model osimModel ,MocoTrajectory solution){
+double fwdCheck(Model osimModel ,MocoTrajectory solution){
 	Storage results=solution.exportToStatesStorage();
          cout<<"getstatevector..."<<endl;
 	StateVector* state = results.getStateVector(0);
@@ -212,7 +212,7 @@ int fwdCheck(Model osimModel ,MocoTrajectory solution){
         cout<<"fwd check jump:"<<maxHeight<<endl;
 
 
-return 0;
+return maxHeight;
 
 
 }
