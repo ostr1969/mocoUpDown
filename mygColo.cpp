@@ -1,0 +1,244 @@
+/* -------------------------------------------------------------------------- *
+ * OpenSim Moco: exampleSlidingMass.cpp                                       *
+ * -------------------------------------------------------------------------- *
+ * Copyright (c) 2017 Stanford University and the Authors                     *
+ *                                                                            *
+ * Author(s): Christopher Dembia                                              *
+ *                                                                            *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
+ * not use this file except in compliance with the License. You may obtain a  *
+ * copy of the License at http://www.apache.org/licenses/LICENSE-2.0          *
+ *                                                                            *
+ * Unless required by applicable law or agreed to in writing, software        *
+ * distributed under the License is distributed on an "AS IS" BASIS,          *
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   *
+ * See the License for the specific language governing permissions and        *
+ * limitations under the License.                                             *
+ * -------------------------------------------------------------------------- */
+
+
+//#include <OpenSim/Simulation/SimbodyEngine/SliderJoint.h>
+#include <OpenSim/OpenSim.h>
+#include <OpenSim/Actuators/DelpActuator.h>
+#include <OpenSim/Common/PiecewiseConstantFunction.h>
+#include <Moco/osimMoco.h>
+//#include <Moco/Components/ActivationCoordinateActuator.h>
+#include <Moco/MocoGoal/MocoGoal.h>
+//#include "ActivationCoordinateActuator.h"
+#include <OpenSim/Common/STOFileAdapter.h>
+#include "console.h"
+//#include "readdelp.h"
+#include "additions.h"
+#include "MocoJumpGoal.h"
+
+using namespace OpenSim;
+using namespace SimTK;
+
+    double qi0L,qi0H,qi1L,qi1H,qi2L,qi2H,qi3L,qi3H;
+    double q0L,q0H,q1L,q1H,q2L,q2H,q3L,q3H;
+    double q0,q1,q2,q3;
+Model buildmodel(){
+	Model osimModel(data.strings[0].val);
+        cout<<"read src/delp_initial.osim"<<endl;
+	osimModel.buildSystem();
+        cout<<"built system"<<endl;
+        // Pin joint initial states
+        CoordinateSet &coordinates = osimModel.updCoordinateSet();
+        coordinates[0].set_default_value( q0);
+        coordinates[1].set_default_value( q1);
+        coordinates[2].set_default_value( q2);
+        coordinates[3].set_default_value( q3);
+        auto& sp=osimModel.updComponent<PathSpring>("/forceset/path_spring");
+        sp.setStiffness(4454.76*data.ints[3].val);
+        cout<<"numsprings:"<<data.ints[3].val<<endl;
+
+        State &si = osimModel.initializeState();
+	Vector stateInitVars(14,0.);
+        stateInitVars(6)=q0;stateInitVars(8)=q1;stateInitVars(10)=q2;stateInitVars(12)=q3;
+        OpenSim::Array<std::string> statelabs=osimModel.getStateVariableNames();
+        for (int i=0;i<statelabs.size();i++) cout<<statelabs[i]<<"\n";
+        //
+	osimModel.setStateVariableValues(si,stateInitVars);
+	//setting optimal forces at the initial angle and activations
+        //Vector udot(4,0.);
+        //InverseDynamicsSolver insol(osimModel);
+        //Vector init_tou=insol.solve(si,udot);
+        //cout<<"Torques for static equilibrium:"<<init_tou<<endl;
+	//setInitDelpActivation(osimModel,si,init_tou);
+	//acts=osimModel.getStateVariableValues(si);
+        //cout<<"initsatate:(not used)"<<acts<<endl;
+
+        
+	OpenSim::Array<std::string> actuNames;
+        for (const auto& actu : osimModel.getComponentList<DelpActuator>()) {
+                actuNames.append(actu.getName());
+        }
+        updateDelpActuator(osimModel, actuNames[0],"src/delp1.txt",.011,.068, 1,16);
+        updateDelpActuator(osimModel, actuNames[1],"src/delp4.txt",.011,.068, 1,18);
+        updateDelpActuator(osimModel, actuNames[2],"src/delp5.txt",.011,.068, 1,20);
+        updateDelpActuator(osimModel, actuNames[3],"src/delp2.txt",.011,.068,-1,16);
+        updateDelpActuator(osimModel, actuNames[4],"src/delp3.txt",.011,.068,-1,18);
+        updateDelpActuator(osimModel, actuNames[5],"src/delp6.txt",.011,.068,-1,20);
+        osimModel.print("results/mycolo_initial.osim");
+//	const ControllerSet &controllerSet = osimModel.getControllerSet();
+	osimModel.updControllerSet().remove(0);
+
+	//auto& tip= osimModel.updJointSet().get("tip");
+        double allStiff = 10000, allDamping = 5., allTransition = 5.;
+         CoordinateLimitForce* toeLimitForce = new  CoordinateLimitForce("q0", 85,
+        allStiff, 0, allStiff, allDamping, allTransition);
+        osimModel.addForce(toeLimitForce);
+
+
+
+	
+	return osimModel;
+	}
+
+int main() {
+    data=readvars();
+    cout<<"starting moco study\n";
+    MocoStudy study;Vector initActivations(14,0.);
+        //q0=59.21615420384034;
+        //q1=  -109.2635775666555;
+        //q2=   121.0735620408570;
+        //q3=  -117.6353763282228;
+        q0=50;q1=-65;q2=20;q3=-20;
+	
+        qi0L=30*Pi/180;qi0H=80*Pi/180;
+        qi1L=-109*Pi/180;qi1H=-50*Pi/180;
+        qi2L=50*Pi/180;qi2H=140*Pi/180;
+        qi3L=-120*Pi/180;qi3H=0*Pi/180;
+        q0=q0*Pi/180.; q1=q1*Pi/180.; q2=q2*Pi/180.; q3=q3*Pi/180.;
+        cout<<"qi:"<<endl<<qi0L<<","<<qi0H<<endl<<
+	qi1L<<","<<qi1H<<endl<<
+	qi2L<<","<<qi2H<<endl<<
+	qi3L<<","<<qi3H<<endl;
+
+    study.setName("4link");
+
+    // Define the optimal control problem.
+    // ===================================
+    MocoProblem& problem = study.updProblem();
+	//build the initial model with initial angles and get initial activations
+	Model osimModel=buildmodel();
+
+	q0L=30*Pi/180;q0H=90*Pi/180;
+	auto& actuA = osimModel.updComponent<DelpActuator>("am");
+	q1L=actuA.getDelpLowAngle();
+	q1H=actuA.getDelpHighAngle();
+	auto& actuK = osimModel.updComponent<DelpActuator>("km");
+	q2L=actuK.getDelpLowAngle();
+	q2H=actuK.getDelpHighAngle();
+	auto& actuH = osimModel.updComponent<DelpActuator>("hm");
+	q3L=actuH.getDelpLowAngle();
+	q3H=actuH.getDelpHighAngle();
+
+    // Model (dynamics).
+    // -----------------
+	cout<<__LINE__<<endl;
+     try { problem.setModelCopy(osimModel);
+	cout<<__LINE__<<endl;
+		}
+     catch (const std::exception& ex)
+    {
+        std::cout << "Exception in 4links_example: " << ex.what() << std::endl;
+        return 1;
+    }
+  
+
+    // Bounds.
+    // -------
+    // Initial time must be 0, final time can be within [0, 5].
+    problem.setTimeBounds(MocoInitialBounds(0), MocoFinalBounds(
+		data.doubles[3].val, data.doubles[0].val));
+
+    // Initial position must be 0, final position must be 1.
+    problem.setStateInfo("/jointset/tip/q0/value", MocoBounds(qi0L,qi0H),
+                         MocoInitialBounds(q0), MocoFinalBounds(qi0L,qi0H));
+    problem.setStateInfo("/jointset/ankle/q1/value", {q1L,q1H}, q1, {q1L,q1H});
+    problem.setStateInfo("/jointset/knee/q2/value",  {q2L,q2H}, q2, {q2L,q2H});
+    problem.setStateInfo("/jointset/hip/q3/value",   {q3L,q3H}, q3, {q3L,q3H});
+
+    //problem.setStateInfo("/jointset/tip/q0/value", MocoBounds(qi0L,qi0H),
+    //                     MocoInitialBounds(q0), MocoFinalBounds(qi0L,qi0H));
+    //problem.setStateInfo("/jointset/ankle/q1/value", {q1l,q1h}, q1, {q1l,q1h});
+    //problem.setStateInfo("/jointset/knee/q2/value",  {q2l,q2h},  q2, {q2l,q2h});
+    //problem.setStateInfo("/jointset/hip/q3/value",   {q3l,q3h},  q3, {q3l,q3h});
+    // Initial and final speed must be 0. Use compact syntax.
+    double v=55.;
+    problem.setStateInfoPattern("/jointset/.*/speed", {-v, v}, 0, {});
+    //problem.setStateInfo("/jointset/ankle/q1/speed", {-v, v}, 0, {});
+    //problem.setStateInfo("/jointset/knee/q2/speed", {-v, v}, 0, {});
+    //problem.setStateInfo("/jointset/hip/q3/speed", {-v, v}, 0, {});
+    //problem.setStateInfo("/ap/activation", {0, 1}, initActivations[0], {0,1});
+    problem.setStateInfo("/ap/activation", {0, 1},0, {0,1});
+    problem.setStateInfo("/kp/activation", {0, 1},0, {0,1});
+    problem.setStateInfo("/hp/activation", {0, 1},0, {0,1});
+    problem.setStateInfo("/am/activation", {-1,0},0, {-1,0});
+    problem.setStateInfo("/km/activation", {-1,0},0, {-1,0});
+    problem.setStateInfo("/hm/activation", {-1,0},0, {-1,0});
+
+    // Applied force must be between -50 and 50.
+    problem.setControlInfo("/ap", MocoBounds(0.,1. ));
+    problem.setControlInfo("/kp", MocoBounds(0.,1. ));
+    problem.setControlInfo("/hp", MocoBounds(0.,1. ));
+    problem.setControlInfo("/am", MocoBounds(-1.0,0. ));
+    problem.setControlInfo("/km", MocoBounds(-1.0,0. ));
+    problem.setControlInfo("/hm", MocoBounds(-1.0,0. ));
+
+    // Cost.
+    // -----
+    //problem.addGoal<MocoFinalTimeGoal>();
+    problem.addGoal<MocoJumpGoal>("Jump");
+    problem.addGoal<MocoFinalTimeGoal>("Time");
+    problem.updGoal("Time").setWeight(0.5);
+
+
+    // Configure the solver.
+    // =====================
+   MocoCasADiSolver& solver = study.initCasADiSolver();
+ //MocoTropterSolver& solver=study.initTropterSolver();
+    solver.set_num_mesh_intervals(data.ints[1].val);
+    //solver.set_verbosity(2);
+    cout<<data.strings[1].val<<endl;
+    solver.set_optim_finite_difference_scheme(data.strings[1].val);
+    solver.set_optim_solver("ipopt");
+    solver.set_optim_max_iterations(data.ints[0].val);
+    solver.set_optim_convergence_tolerance(data.doubles[2].val);
+    solver.set_optim_constraint_tolerance(data.doubles[2].val);
+    solver.set_parameters_require_initsystem(data.ints[2].val);
+
+
+    // Now that we've finished setting up the tool, print it to a file.
+    study.print("results/mycolo.omoco");
+    solver.setGuessFile("src/colotraj.sto");
+
+    // Solve the problem.
+    // ==================
+    MocoSolution solution = study.solve();
+    //solution.unseal();
+    debugLog<<"got objective:"<<solution.getObjective()<<endl;
+	//solution.resampleWithNumTimes(50);
+    solution.write("results/mycolo_traj.sto");
+    TimeSeriesTable statesTable=solution.exportToStatesTable();
+timSeriesToBinFile(statesTable,"results/mycolo_states.bin");
+   // Storage statestorage=solution.exportToStatesStorage();
+    STOFileAdapter::write(statesTable, "results/mycolo_states.sto");
+    TimeSeriesTable controlTable=solution.exportToControlsTable();
+    STOFileAdapter::write(controlTable, "results/mycolo_controls.sto");
+
+timSeriesToBinFile(controlTable,"results/mycolo_controls.bin");
+
+
+    //solution.resampleWithNumTimes(1300);
+    //solution.write("mycolo_hightraj.sto");
+    // Visualize.
+    // ==========
+    //study.visualize(solution);
+    fwdCheck(osimModel , solution );
+    cout<<"got objective:"<<solution.getObjective()<<endl;
+    cout<<"numsprings:"<<data.ints[3].val<<endl;
+
+    return EXIT_SUCCESS;
+}
