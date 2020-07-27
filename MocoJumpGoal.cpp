@@ -39,7 +39,7 @@ void MocoJumpGoal::calcIntegrandImpl(
       const SimbodyMatterSubsystem& matter= getModel().getMultibodySystem().
                         getMatterSubsystem();
      matter.calcMobilizerReactionForces( input.state,forcesAtMInG);
-     integrand=forcesAtMInG[0][1][1];
+     integrand=-forcesAtMInG[0][1][1];
 }
 
 
@@ -58,7 +58,6 @@ void MocoJumpGoal::calcGoalImpl(
 	 getModel().getMultibodySystem().getMatterSubsystem().
 			calcMobilizerReactionForces( input.final_state,forcesAtMInG);
 
-    //cost[0] = input.integral;
     double t1=-.2,t2=0.2,vy=comFinalV(1);
     double k=std::max(0.,std::min(1.,(vy-t1)/(t2-t1)));
     double dirac=k*k*(3-2*k);
@@ -66,11 +65,12 @@ void MocoJumpGoal::calcGoalImpl(
 
     double f=forcesAtMInG[0][1][1];
     if (f>=0){
-    t1=0;t2=28000;double y1=0,y2=28;
+    t1=0;t2=28000;double y1=0,y2=20;
     k=std::max(0.,std::min(1.,(f-t1)/(t2-t1)));
     cost[1]=k*k*(3-2*k)*(y2-y1)+y1;}
     if (f<0){
-    t1=-28000;t2=0;double y1=28,y2=0;
+    t1=-28000;t2=0;double y1=80,y2=0;
     k=std::max(0.,std::min(1.,(f-t1)/(t2-t1)));
     cost[1]=k*k*(3-2*k)*(y2-y1)+y1;}
+    //cost[3] = input.integral;
 }

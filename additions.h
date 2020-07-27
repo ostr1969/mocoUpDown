@@ -208,7 +208,9 @@ double fwdCheck(Model osimModel ,MocoTrajectory solution){
 
         double maxHeight = (COM_velocity[1]>0?COM_position[1] +
                                 pow(COM_velocity[1], 2.0)/(2.0*g):0);
+	auto row0=statesTable.getNearestRow(0,true)*180/Pi;
 
+	cout<<"initAng:"<<row0[6]<<","<<row0[8]<<","<<row0[10]<<","<<row0[12]<<endl;
         cout<<"fwd check jump:"<<maxHeight<<endl;
 
 
