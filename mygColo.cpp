@@ -52,23 +52,6 @@ Model buildmodel(){
         sp.setStiffness(4454.76*data.ints[3].val);
         cout<<"numsprings:"<<data.ints[3].val<<endl;
 
-        State &si = osimModel.initializeState();
-	Vector stateInitVars(14,0.);
-        stateInitVars(6)=q0;stateInitVars(8)=q1;stateInitVars(10)=q2;stateInitVars(12)=q3;
-        OpenSim::Array<std::string> statelabs=osimModel.getStateVariableNames();
-        for (int i=0;i<statelabs.size();i++) cout<<statelabs[i]<<"\n";
-        //
-	osimModel.setStateVariableValues(si,stateInitVars);
-	//setting optimal forces at the initial angle and activations
-        //Vector udot(4,0.);
-        //InverseDynamicsSolver insol(osimModel);
-        //Vector init_tou=insol.solve(si,udot);
-        //cout<<"Torques for static equilibrium:"<<init_tou<<endl;
-	//setInitDelpActivation(osimModel,si,init_tou);
-	//acts=osimModel.getStateVariableValues(si);
-        //cout<<"initsatate:(not used)"<<acts<<endl;
-
-        
 	OpenSim::Array<std::string> actuNames;
         for (const auto& actu : osimModel.getComponentList<DelpActuator>()) {
                 actuNames.append(actu.getName());
@@ -81,6 +64,40 @@ Model buildmodel(){
         updateDelpActuator(osimModel, actuNames[5],"src/delp6.txt",.011,.068,-1,20);
 //	const ControllerSet &controllerSet = osimModel.getControllerSet();
 	osimModel.updControllerSet().remove(0);
+
+        double allStiff = 10000, allDamping = 5., allTransition = 5.;
+         CoordinateLimitForce* toeLimitForce = new  CoordinateLimitForce("q0", 85,
+        allStiff, 0, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* ankleLimitForce = new  CoordinateLimitForce("q1", q1H*180/Pi-5,
+        allStiff, q1L*180/Pi+5, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* kneeLimitForce = new  CoordinateLimitForce("q2", q2H*180/Pi-5,
+        allStiff, q2L*180/Pi+5, allStiff, allDamping, allTransition);
+         CoordinateLimitForce* hipLimitForce = new  CoordinateLimitForce("q3", q3H*180/Pi-5,
+        allStiff, q3L*180/Pi+5, allStiff, allDamping, allTransition);
+        //osimModel.addForce(toeLimitForce);
+        //osimModel.addForce(ankleLimitForce);
+        //osimModel.addForce(kneeLimitForce);
+        //osimModel.addForce(hipLimitForce);
+
+	osimModel.buildSystem();
+        State &si = osimModel.initializeState();
+        si.getQ().dump("initial q");
+	//Vector stateInitVars(14,0.);
+        //stateInitVars(6)=q0;stateInitVars(8)=q1;stateInitVars(10)=q2;stateInitVars(12)=q3;
+        OpenSim::Array<std::string> statelabs=osimModel.getStateVariableNames();
+        for (int i=0;i<statelabs.size();i++) cout<<statelabs[i]<<"\n";
+        //
+	//osimModel.setStateVariableValues(si,stateInitVars);
+	//setting optimal forces at the initial angle and activations
+        //Vector udot(4,0.);
+        //InverseDynamicsSolver insol(osimModel);
+        //Vector init_tou=insol.solve(si,udot);
+        //cout<<"Torques for static equilibrium:"<<init_tou<<endl;
+	//setInitDelpActivation(osimModel,si,init_tou);
+	//acts=osimModel.getStateVariableValues(si);
+        //cout<<"initsatate:(not used)"<<acts<<endl;
+
+        
 
 	q0L=30*Pi/180;q0H=90*Pi/180;
 	auto& actuA = osimModel.updComponent<DelpActuator>("am");
@@ -98,19 +115,6 @@ Model buildmodel(){
 	q3L<<","<<q3H<<endl;
 
 	//auto& tip= osimModel.updJointSet().get("tip");
-        double allStiff = 10000, allDamping = 5., allTransition = 5.;
-         CoordinateLimitForce* toeLimitForce = new  CoordinateLimitForce("q0", 85,
-        allStiff, 0, allStiff, allDamping, allTransition);
-         CoordinateLimitForce* ankleLimitForce = new  CoordinateLimitForce("q1", q1H*180/Pi-5,
-        allStiff, q1L*180/Pi+5, allStiff, allDamping, allTransition);
-         CoordinateLimitForce* kneeLimitForce = new  CoordinateLimitForce("q2", q2H*180/Pi-5,
-        allStiff, q2L*180/Pi+5, allStiff, allDamping, allTransition);
-         CoordinateLimitForce* hipLimitForce = new  CoordinateLimitForce("q3", q3H*180/Pi-5,
-        allStiff, q3L*180/Pi+5, allStiff, allDamping, allTransition);
-        osimModel.addForce(toeLimitForce);
-        osimModel.addForce(ankleLimitForce);
-        osimModel.addForce(kneeLimitForce);
-        osimModel.addForce(hipLimitForce);
 
         osimModel.print("results/mycolo_initial.osim");
 
@@ -135,20 +139,9 @@ int main() {
 	//build the initial model with initial angles and get initial activations
 	Model osimModel=buildmodel();
 
-
     // Model (dynamics).
     // -----------------
-	cout<<__LINE__<<endl;
-     try { problem.setModelCopy(osimModel);
-	cout<<__LINE__<<endl;
-		}
-     catch (const std::exception& ex)
-    {
-        std::cout << "Exception in 4links_example: " << ex.what() << std::endl;
-        return 1;
-    }
-  
-
+      problem.setModelCopy(osimModel);
     // Bounds.
     // -------
     // Initial time must be 0, final time can be within [0, 5].
@@ -170,6 +163,7 @@ int main() {
     // Initial and final speed must be 0. Use compact syntax.
     double v=55.;
     problem.setStateInfoPattern("/jointset/.*/speed", {-v, v}, 0, {});
+    //problem.setStateInfoPattern("/forceset/.*LimitForce/dissipatedEnergy",{-1e6,1e6} , 0, {});
     //problem.setStateInfo("/jointset/ankle/q1/speed", {-v, v}, 0, {});
     //problem.setStateInfo("/jointset/knee/q2/speed", {-v, v}, 0, {});
     //problem.setStateInfo("/jointset/hip/q3/speed", {-v, v}, 0, {});
@@ -214,7 +208,7 @@ int main() {
 
     // Now that we've finished setting up the tool, print it to a file.
     study.print("results/mycolo.omoco");
-    solver.setGuessFile("src/colotraj.sto");
+    //solver.setGuessFile(data.strings[2].val);
 
     // Solve the problem.
     // ==================

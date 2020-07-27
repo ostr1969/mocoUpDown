@@ -700,7 +700,7 @@
 					<!--The linear stiffness (N/m) of the PathSpring-->
 					<stiffness>17819.040000000001</stiffness>
 					<!--The dissipation factor (s/m) of the PathSpring-->
-					<dissipation>0.01</dissipation>
+					<dissipation>0.00</dissipation>
 				</PathSpring>
 			</objects>
 			<groups />

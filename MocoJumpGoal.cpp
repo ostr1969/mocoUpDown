@@ -27,7 +27,7 @@ using namespace SimTK;
 
 
 void MocoJumpGoal::initializeOnModelImpl(const Model& model ) const {
-    setRequirements(0, 1);
+    setRequirements(0, 2);
 	//model.print("aaa.osim");
     
 }
@@ -63,6 +63,7 @@ void MocoJumpGoal::calcGoalImpl(
     double k=std::max(0.,std::min(1.,(vy-t1)/(t2-t1)));
     double dirac=k*k*(3-2*k);
     cost[0]=-vy*vy/2./9.81*dirac-comFinalP(1);
+
     double f=forcesAtMInG[0][1][1];
     if (f>=0){
     t1=0;t2=28000;double y1=0,y2=28;
