@@ -130,7 +130,6 @@ int main() {
         q0=data.doubles[4].val;q1=data.doubles[5].val;q2=data.doubles[6].val;q3=data.doubles[7].val;
 	
         q0=q0*Pi/180.; q1=q1*Pi/180.; q2=q2*Pi/180.; q3=q3*Pi/180.;
-	cout<<"qi:"<<q0<<","<<q1<<","<<q2<<","<<q3<<endl;
 
     study.setName("4link");
 
@@ -151,8 +150,8 @@ int main() {
 
     // Initial position must be 0, final position must be 1.
     problem.setStateInfo("/jointset/tip/q0/value", MocoBounds(q0L,q0H),
-                         MocoInitialBounds(q0*0.8,q0*1.2), MocoFinalBounds(q0L,q0H));
-    problem.setStateInfo("/jointset/ankle/q1/value", {q1L,q1H}, {q1*1.2,q1*0.8}, {q1L,q1H});
+                         MocoInitialBounds(q0), MocoFinalBounds(q0L,q0H));
+    problem.setStateInfo("/jointset/ankle/q1/value", {q1L,q1H}, q1, {q1L,q1H});
     problem.setStateInfo("/jointset/knee/q2/value",  {q2L,q2H}, q2, {q2L,q2H});
     problem.setStateInfo("/jointset/hip/q3/value",   {q3L,q3H}, q3, {q3L,q3H});
 

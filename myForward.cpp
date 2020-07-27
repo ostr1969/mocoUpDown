@@ -254,9 +254,6 @@ int main(int argc, char *argv[]){
 	const Set<const Actuator>& actSet = osimModel.get_ControllerSet().get(0).getActuatorSet();
 
         //cout.precision(15);
-        auto row0=statesTable.getNearestRow(0,true)*180/Pi;
-        cout<<"initAng:"<<row0[6]<<","<<row0[8]<<","<<row0[10]<<","<<row0[12]<<endl;
-
         cout<<"num of springs:"<<spnum<<endl;
 	cout<<"pos:"<<COM_position<<" vel:"<<COM_velocity<<endl;
 	cout<<"jump:"<<maxHeight<<endl;
